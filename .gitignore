@@ -18,6 +18,8 @@ Thumbs.db
 CLAUDE.md
 Chapter6_*
 mtrafficsys/
-mtrafficsys_*/
-中国高校计算机大赛*/
+mtrafficsys_*.*
+中国高校计算机大赛*.*
 选拔赛/
+*.docx
+*.zip
