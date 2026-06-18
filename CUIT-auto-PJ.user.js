@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         自动评教脚本（CUIT 成都信息工程大学）
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  成都信息工程大学教务系统自动评教脚本 — Apple 风格界面，支持自动/手动提交、自定义评教内容、速度调节、快速模式
 // @author       轻舟行
 // @match        https://jwc.cuit.edu.cn/eams/quality/stdEvaluate*
 // @match        http://jwc.cuit.edu.cn/eams/quality/stdEvaluate*
 // @match        https://jwgl.cuit.edu.cn/eams/quality/stdEvaluate*
 // @match        http://jwgl.cuit.edu.cn/eams/quality/stdEvaluate*
-// @grant        GM_addStyle
+// @grant        GM_addStyle 
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_notification
@@ -17,6 +17,7 @@
 
 (function() {
     'use strict';
+    console.log('[评教脚本] v1.3 脚本已加载, URL:', window.location.href);
 
     let autoSubmit = GM_getValue('autoSubmit', false);
     let isProcessing = GM_getValue('isProcessing', false);
