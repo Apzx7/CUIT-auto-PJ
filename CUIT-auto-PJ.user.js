@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         自动评教脚本（CUIT 成都信息工程大学）
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  成都信息工程大学教务系统自动评教脚本 — Apple 风格界面，支持自动/手动提交、自定义评教内容、速度调节、快速模式
 // @author       轻舟行
 // @match        https://jwc.cuit.edu.cn/eams/quality/stdEvaluate*
@@ -1621,16 +1621,16 @@
 
     /* --- 页面检测 --- */
     function isEvaluationPage() {
-        // CUIT 评教表单页: URL 包含 stdEvaluate!answer，且有 #app-main
-        return window.location.href.indexOf('stdEvaluate!answer') !== -1
-            && document.getElementById('app-main') !== null;
+        // CUIT 评教表单页: URL 包含 stdEvaluate!answer
+        // 不再强制检查 #app-main，因为 Backbone 可能还没渲染
+        return window.location.href.indexOf('stdEvaluate!answer') !== -1;
     }
 
     function isListPage() {
-        // CUIT 评教列表页: URL 包含 stdEvaluate.action（不含 !answer），且有评教表格
+        // CUIT 评教列表页: URL 包含 stdEvaluate.action（不含 !answer）
+        // 只要 URL 匹配就认为是列表页，不强制要求特定 DOM 元素
         return window.location.href.indexOf('stdEvaluate.action') !== -1
-            && window.location.href.indexOf('stdEvaluate!answer') === -1
-            && (document.querySelector('table.gridtable') !== null || getPendingTeacherCount() > 0);
+            && window.location.href.indexOf('stdEvaluate!answer') === -1;
     }
 
     /* --- 列表页操作 --- */
@@ -2094,8 +2094,13 @@
 
     /* ===== 初始化 ===== */
     function init() {
+        console.log('[评教脚本] v1.2 初始化中...', window.location.href);
+
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', createControlPanel);
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('[评教脚本] DOM 已加载，创建控制面板');
+                createControlPanel();
+            });
         } else {
             createControlPanel();
         }
