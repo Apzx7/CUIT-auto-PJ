@@ -71,7 +71,7 @@
 
 ### 安装步骤
 
-1. 点击 [`cuit-auto-evaluate.user.js`](cuit-auto-evaluate.user.js) 查看源码
+1. 点击 [`CUIT-auto-PJ.user.js`](CUIT-auto-PJ.user.js) 查看源码
 2. 复制全部内容
 3. 打开 Tampermonkey 控制台 → **新建脚本** → 粘贴 → **保存**
 4. 访问教务评教页面，脚本自动运行
