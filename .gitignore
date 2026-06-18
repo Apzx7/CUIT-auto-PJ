@@ -13,3 +13,11 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Other projects in this directory
+CLAUDE.md
+Chapter6_*
+mtrafficsys/
+mtrafficsys_*/
+中国高校计算机大赛*/
+选拔赛/
