@@ -71,10 +71,14 @@
 
 ### 安装步骤
 
-1. 点击 [`CUIT-auto-PJ.user.js`](CUIT-auto-PJ.user.js) 查看源码
-2. 复制全部内容
-3. 打开 Tampermonkey 控制台 → **新建脚本** → 粘贴 → **保存**
-4. 访问教务评教页面，脚本自动运行
+1. 浏览器安装 [Tampermonkey](https://www.tampermonkey.net/) 扩展
+2. **重要**：打开 Tampermonkey 设置 → **安全** → 勾选 **允许用户脚本访问所有站点**（或在扩展管理页面允许"允许访问文件网址"）
+3. 点击 [`CUIT-auto-PJ.user.js`](CUIT-auto-PJ.user.js) 查看源码
+4. 复制全部内容
+5. 打开 Tampermonkey 控制台（点击图标 → 管理面板）→ 点 **+** 号新建脚本 → 清空模板内容 → 粘贴 → `Ctrl + S` 保存
+6. 访问教务评教页面，脚本自动运行
+
+> **快捷安装**：打开仓库页面，点击文件名 → 点 **Raw** 按钮，Tampermonkey 会自动弹出安装提示。
 
 ## 使用方法
 
