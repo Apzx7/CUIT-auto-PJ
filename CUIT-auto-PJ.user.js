@@ -1622,26 +1622,53 @@
 
     /* --- 页面检测 --- */
     function isEvaluationPage() {
-        // CUIT 评教表单页: URL 包含 stdEvaluate!answer
-        // 不再强制检查 #app-main，因为 Backbone 可能还没渲染
-        return window.location.href.indexOf('stdEvaluate!answer') !== -1;
+        // 检测方式 1：URL 包含 stdEvaluate!answer
+        if (window.location.href.indexOf('stdEvaluate!answer') !== -1) return true;
+        // 检测方式 2：页面上已有评教题目（bg.Go AJAX 加载的情况，URL 不变）
+        if (document.getElementById('question-list') &&
+            document.getElementById('question-list').querySelector('input[type="radio"]')) return true;
+        // 检测方式 3：有提交按钮（评教表单页）
+        if (document.getElementById('sub') &&
+            document.getElementById('actionForm')) return true;
+        return false;
     }
 
     function isListPage() {
-        // CUIT 评教列表页: URL 包含 stdEvaluate.action（不含 !answer）
-        // 只要 URL 匹配就认为是列表页，不强制要求特定 DOM 元素
-        return window.location.href.indexOf('stdEvaluate.action') !== -1
-            && window.location.href.indexOf('stdEvaluate!answer') === -1;
+        const href = window.location.href;
+        // URL 包含 stdEvaluate.action（不含 !answer），或 URL 含 stdEvaluate!innerIndex
+        const isEvalUrl = href.indexOf('stdEvaluate.action') !== -1
+            || href.indexOf('stdEvaluate!innerIndex') !== -1;
+        const isNotAnswer = href.indexOf('stdEvaluate!answer') === -1;
+        // DOM 检测：有评教链接或评教表格
+        const hasEvalLinks = getPendingTeacherCount() > 0;
+        const hasGrid = document.querySelector('table.gridtable') !== null;
+        // URL 匹配即可，DOM 检测作为补充
+        return isEvalUrl && isNotAnswer;
     }
 
     /* --- 列表页操作 --- */
     function getPendingTeacherCount() {
-        return document.querySelectorAll('a[href*="stdEvaluate!answer.action"]').length;
+        // 匹配多种可能的评教链接格式
+        const links = document.querySelectorAll(
+            'a[href*="stdEvaluate!answer.action"], ' +
+            'a[href*="stdEvaluate!answer?"], ' +
+            'span.eval, ' +
+            '.card-btn[data-action*="评教"]'
+        );
+        return links.length;
     }
 
     function clickNextTeacher() {
-        const evalLink = document.querySelector('a[href*="stdEvaluate!answer.action"]');
+        // 优先匹配标准链接
+        let evalLink = document.querySelector('a[href*="stdEvaluate!answer.action"]');
+        if (!evalLink) evalLink = document.querySelector('a[href*="stdEvaluate!answer?"]');
+        // 匹配 span.eval 内的链接
+        if (!evalLink) {
+            const evalSpan = document.querySelector('span.eval');
+            if (evalSpan) evalLink = evalSpan.closest('a');
+        }
         if (evalLink) {
+            appendLog(`点击评教: ${evalLink.textContent.trim()}`);
             evalLink.click();
             return true;
         }
@@ -1689,6 +1716,52 @@
     function findTextarea() {
         const textareas = getTextareas();
         return textareas.length > 0 ? textareas[textareas.length - 1] : null;
+    }
+
+    // 等待评教页面就绪（支持 URL 变化或 DOM 出现题目两种检测）
+    function waitForEvalPageReady(timeout) {
+        timeout = timeout || 15000;
+        return new Promise((resolve) => {
+            // 已经就绪？
+            if (isEvaluationPage()) { resolve(true); return; }
+
+            const startTime = Date.now();
+
+            // 方式 1：监听 URL 变化（页面跳转）
+            const urlChecker = setInterval(() => {
+                if (window.location.href.indexOf('stdEvaluate!answer') !== -1) {
+                    clearInterval(urlChecker);
+                    clearInterval(domChecker);
+                    resolve(true);
+                }
+            }, 300);
+
+            // 方式 2：监听 DOM 变化（AJAX 加载内容到当前页面）
+            const questionList = document.getElementById('question-list') || document.body;
+            const domChecker = setInterval(() => {
+                // 检查是否出现了评教表单
+                const newQuestionList = document.getElementById('question-list');
+                const hasRadios = newQuestionList && newQuestionList.querySelector('input[type="radio"]');
+                const hasSubmit = document.getElementById('sub');
+                const hasActionForm = document.getElementById('actionForm');
+                if (hasRadios || (hasSubmit && hasActionForm)) {
+                    clearInterval(urlChecker);
+                    clearInterval(domChecker);
+                    resolve(true);
+                } else if (Date.now() - startTime > timeout) {
+                    clearInterval(urlChecker);
+                    clearInterval(domChecker);
+                    resolve(false);
+                }
+            }, 500);
+
+            // 超时兜底
+            setTimeout(() => {
+                clearInterval(urlChecker);
+                clearInterval(domChecker);
+                resolve(isEvaluationPage());
+            }, timeout + 500);
+        });
     }
 
     // 等待 Backbone 渲染完成
@@ -1909,21 +1982,19 @@
             if (shouldStop) return;
 
             if (clickNextTeacher()) {
-                // CUIT 使用 bg.Go() 可能 AJAX 加载内容，需要等待
-                await sleep(3000);
+                // CUIT 使用 bg.Go() 可能 AJAX 加载内容（URL 不变）
+                // 所以需要同时检测 URL 变化和 DOM 出现题目
+                appendLog('等待评教页面加载...');
+                const evalReady = await waitForEvalPageReady(15000);
                 if (shouldStop) return;
 
-                if (isEvaluationPage()) {
+                if (evalReady) {
+                    appendLog('评教页面已就绪');
                     await processEvaluationPage();
                 } else {
-                    appendLog('等待评教页面加载...');
-                    await sleep(3000);
-                    if (isEvaluationPage()) {
-                        await processEvaluationPage();
-                    } else {
-                        logError('无法进入评教页面，请检查页面是否正确加载');
-                        stopEvaluation();
-                    }
+                    logError('无法进入评教页面，等待超时');
+                    appendLog('当前 URL: ' + window.location.href);
+                    stopEvaluation();
                 }
             } else {
                 appendLog('所有评教已完成！');
@@ -2095,17 +2166,23 @@
 
     /* ===== 初始化 ===== */
     function init() {
-        console.log('[评教脚本] v1.2 初始化中...', window.location.href);
+        console.log('[评教脚本] v1.3 脚本已加载, URL:', window.location.href);
 
+        // 始终创建控制面板（悬浮球 + 面板）
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() {
                 console.log('[评教脚本] DOM 已加载，创建控制面板');
                 createControlPanel();
+                detectPageAndInit();
             });
         } else {
             createControlPanel();
+            // 延迟检测，等页面动态内容加载
+            setTimeout(detectPageAndInit, 500);
         }
+    }
 
+    function detectPageAndInit() {
         // 恢复跨域跳转前的进度
         const savedCompleted = GM_getValue('completedCount', 0);
         const savedTotal = GM_getValue('totalCount', 0);
@@ -2121,7 +2198,6 @@
                 if (rendered) {
                     appendLog('题目已渲染');
                     updateUIStatus('评教表单已就绪');
-                    // 如果是从列表页跳转过来的（isProcessing 为 true），自动开始处理
                     if (isProcessing) {
                         appendLog('自动继续评教流程...');
                         processEvaluationPage();
@@ -2132,30 +2208,53 @@
                 }
             });
         } else if (isListPage()) {
-            const count = getPendingTeacherCount();
-            totalCount = (savedCompleted > 0 ? savedCompleted : 0) + count;
-            updateProgress();
-            appendLog(`检测到 ${count} 位待评教老师`);
-            if (count > 0) {
-                updateUIStatus(`待评教: ${count} 位`);
-                // 如果是从评教页提交后跳转回来的，自动继续
-                if (isProcessing && savedCompleted > 0) {
-                    appendLog(`已完成 ${savedCompleted} 位，继续下一位...`);
-                    setTimeout(() => processListPage(), 1500);
+            // 等待评教链接加载（页面可能动态渲染）
+            waitForEvalLinks(8000).then(count => {
+                appendLog(`检测到 ${count} 位待评教老师`);
+                totalCount = (savedCompleted > 0 ? savedCompleted : 0) + count;
+                updateProgress();
+                if (count > 0) {
+                    updateUIStatus(`待评教: ${count} 位`);
+                    if (isProcessing && savedCompleted > 0) {
+                        appendLog(`已完成 ${savedCompleted} 位，继续下一位...`);
+                        setTimeout(() => processListPage(), 1500);
+                    }
+                } else {
+                    updateUIStatus('所有评教已完成 ✓');
+                    appendLog('所有评教已完成！');
+                    showCelebration();
+                    GM_notification({ title: '评教完成', text: '所有老师评教已完成', timeout: 5000 });
+                    GM_setValue('completedCount', 0);
+                    GM_setValue('totalCount', 0);
+                    GM_setValue('isProcessing', false);
                 }
-            } else {
-                updateUIStatus('所有评教已完成 ✓');
-                appendLog('所有评教已完成！');
-                showCelebration();
-                GM_notification({ title: '评教完成', text: '所有老师评教已完成', timeout: 5000 });
-                GM_setValue('completedCount', 0);
-                GM_setValue('totalCount', 0);
-                GM_setValue('isProcessing', false);
-            }
+            });
         } else {
-            appendLog('⚠️ 请前往待评教列表页面');
+            appendLog('⚠️ 当前页面未识别，请前往评教列表页面');
+            appendLog('当前 URL: ' + window.location.href);
             updateUIStatus('⚠️ 请前往列表页面');
         }
+    }
+
+    // 等待评教链接出现（页面可能动态加载）
+    function waitForEvalLinks(timeout) {
+        timeout = timeout || 8000;
+        return new Promise((resolve) => {
+            const count = getPendingTeacherCount();
+            if (count > 0) { resolve(count); return; }
+
+            const startTime = Date.now();
+            const checker = setInterval(() => {
+                const c = getPendingTeacherCount();
+                if (c > 0) {
+                    clearInterval(checker);
+                    resolve(c);
+                } else if (Date.now() - startTime > timeout) {
+                    clearInterval(checker);
+                    resolve(0);
+                }
+            }, 500);
+        });
     }
 
     init();
